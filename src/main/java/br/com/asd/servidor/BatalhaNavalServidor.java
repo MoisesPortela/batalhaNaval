@@ -5,8 +5,8 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.util.HashMap;
-import java.util.regex.MatchResult;
+import java.util.*;
+import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -22,28 +22,92 @@ public class BatalhaNavalServidor extends Thread {
         portasJogadores = new HashMap<>();
     }
 
+    public boolean enviarRespostaConexao(int tamanhoDefinidoTabuleiro, String quemDefiniuTamanhoTabuleiro) throws IOException {
+        try {
+            for (Entry<String, String> entry : portasJogadores.entrySet()) {
+                Set<String> keysJogadores = new HashSet<>();
+                String jogadorOponente = "";
+
+                keysJogadores = portasJogadores.keySet();
+
+                for (String key : keysJogadores) {
+                    if (!key.equals(entry.getKey())) {
+                        jogadorOponente = key;
+                    }
+                }
+
+                String responseMsg = String.format("statusConnect: %s, tamanhoTabuleiro: %s, quemDefiniuTamanhoTabuleiro: %s, jogadorOponente: %s", true, tamanhoDefinidoTabuleiro, quemDefiniuTamanhoTabuleiro, jogadorOponente);
+                buf = responseMsg.getBytes();
+
+                DatagramPacket packet = new DatagramPacket(buf, buf.length, InetAddress.getByName("localhost"), Integer.parseInt(entry.getValue()));
+                System.out.println("Enviando resposta de conexão para " + entry.getKey() + " na porta " + entry.getValue());
+                socket.send(packet);
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     @Override
     public void run() {
         running = true;
+        boolean conexaoDoisJogadores = false;
 
-        Pattern extracaoNomeJogadorPattern = Pattern.compile("(?<=jogador: )(.*)(?=,)");
+        int tamanhoDefinidoTabuleiro = 0;
+        String quemDefiniuTamanhoTabuleiro = "";
 
+        Pattern extracaoNomeJogadorPattern = Pattern.compile("(?<=jogador: )(.*)(?=, tipo: )");
+        Pattern extracaoTamanhoTabuleiroPattern = Pattern.compile("(?<=tamanhoTabuleiro: )(.*)");
 
         while (running) {
 //            Receber requisição
             DatagramPacket packet = new DatagramPacket(buf, buf.length);
 
             try {
+//                Receber requisição dos clientes
                 socket.receive(packet);
-                Matcher jogadorMatcher = extracaoNomeJogadorPattern.matcher(new String(packet.getData(), 0, packet.getLength()));
-                MatchResult resultadoMatchJogador = jogadorMatcher.toMatchResult();
 
-//                System.out.println(resultadoMatchJogador);
-//                System.out.println(resultadoMatchJogador.start());
-                System.out.println("Deu match?" + jogadorMatcher.find());
-                System.out.println("Match start do nome do jogador:" + jogadorMatcher.start());
-                System.out.println("Match end do nome do jogador:" + jogadorMatcher.end());
-                System.out.println("Match do jogador:" + jogadorMatcher.group(0));
+//                Criar um matcher para extrair nome do jogador a partir da regex definica acima, em extracaoNomeJogadorPattern
+                Matcher jogadorMatcher = extracaoNomeJogadorPattern.matcher(new String(packet.getData(), 0, packet.getLength()));
+
+//                Incluir o nome do jogador que enviou a requisição no HashMap de portas de jogadores.
+                if (jogadorMatcher.find()) {
+                    System.out.println("Match do jogador: " + jogadorMatcher.group(0));
+
+//                    Se o número de jogadores for menor ou igual a dois, incluir no HashMap de portas.
+                    if (portasJogadores.size() <= 2) {
+                        portasJogadores.put(jogadorMatcher.group(0), String.valueOf(packet.getPort()));
+                    }
+                }
+
+//                Criar um matcher para extrair o tamanho do tabuleiro a partir da regex definica acima, em extracaoTamanhoTabuleiroPattern
+//                Aqui, será definido o tamanho do tabuleiro. Se o tamanho do tabuleiro já tiver sido definido, não será possível definir novamente.
+                if (tamanhoDefinidoTabuleiro == 0) {
+                    Matcher tamanhoTabuleiroMatcher = extracaoTamanhoTabuleiroPattern.matcher(new String(packet.getData(), 0, packet.getLength()));
+
+                    if (tamanhoTabuleiroMatcher.find()) {
+                        tamanhoDefinidoTabuleiro = Integer.parseInt(tamanhoTabuleiroMatcher.group(0));
+                        quemDefiniuTamanhoTabuleiro = jogadorMatcher.group(0);
+                    }
+                }
+
+//                Verificar se o hash map possui dois jogadores, se sim, iniciar o jogo
+                if (portasJogadores.size() == 2 && !conexaoDoisJogadores && tamanhoDefinidoTabuleiro != 0) {
+
+                    System.out.println("Dois jogadores tentando se conectar.");
+                    System.out.println("Enviando mensagem de conexão bem-sucedida aos jogadores.");
+                    System.out.println("Tamanho do tabuleiro definido: " + tamanhoDefinidoTabuleiro + ". Quem definiu o tamanho do tabuleiro foi: " + quemDefiniuTamanhoTabuleiro);
+
+                    conexaoDoisJogadores = enviarRespostaConexao(tamanhoDefinidoTabuleiro, quemDefiniuTamanhoTabuleiro);
+
+                    if (conexaoDoisJogadores) {
+                        System.out.println("Mensagem de conexão bem-sucedida enviada com sucesso.");
+                    } else {
+                        System.out.println("Erro ao enviar mensagem de conexão bem-sucedida.");
+                    }
+
+                }
 
                 InetAddress address = packet.getAddress();
                 int port = packet.getPort();
@@ -62,8 +126,6 @@ public class BatalhaNavalServidor extends Thread {
                     running = false;
                     continue;
                 }
-
-                socket.send(packet);
 
             } catch (IOException e) {
                 throw new RuntimeException(e);
