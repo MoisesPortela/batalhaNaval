@@ -35,6 +35,7 @@ public class ConsoleCliente extends Thread {
     @Override
     public void run() {
         boolean conexaoEstabelecida = false;
+        boolean gameOver = false;
 
         try {
             Scanner scanner = new Scanner(System.in);
@@ -72,8 +73,15 @@ public class ConsoleCliente extends Thread {
                 }
             }
 
+//            Atualizar o tabuleiro, após estabelecida a conexão com o outro jogador.
+            cliente.setTamanhoTabuleiro(mensagemConexao.getTamanhoTabuleiro());
+
+//            Jogador envia ataque
+//           Servidor redireciona ataque para o outro jogador
+//            O outro jogador Recebe o ataque
+
 //            Enviar ataques ao outro jogador
-            while (true) {
+            while (!gameOver) {
                 System.out.println("Digite o endereço de um ataque: ");
                 String request = scanner.nextLine();
                 String response = cliente.sendAtaque(request);
