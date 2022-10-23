@@ -34,4 +34,5 @@ public class PosicaoNavio {
     public void setAtingido(boolean atingido) {
         this.atingido = atingido;
     }
+
 }

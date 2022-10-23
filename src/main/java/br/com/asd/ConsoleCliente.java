@@ -5,6 +5,7 @@ import br.com.asd.mensagens.MensagemConexao;
 
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.HashMap;
 import java.util.Scanner;
 
 public class ConsoleCliente extends Thread {
@@ -32,10 +33,20 @@ public class ConsoleCliente extends Thread {
         }
     }
 
+    public void computarGameOver(String nome, String quemGanhou) {
+        if (quemGanhou.equals(nome)) {
+            System.out.println("Você ganhou a batalha naval!");
+        } else {
+            System.out.println("O jogador " + quemGanhou + " ganhou!");
+        }
+    }
+
     @Override
     public void run() {
         boolean conexaoEstabelecida = false;
         boolean gameOver = false;
+        boolean meuTurno = false;
+        String quemGanhou = "";
 
         try {
             Scanner scanner = new Scanner(System.in);
@@ -62,6 +73,12 @@ public class ConsoleCliente extends Thread {
                         System.out.println("O tamanho do tabuleiro definido foi: " + mensagemConexao.getTamanhoTabuleiro());
                         System.out.println("O jogador que definiu o tamanho do tabuleiro foi: " + mensagemConexao.getQuemDefiniuTamanhoTabuleiro());
                         System.out.println("O jogador oponente é: " + mensagemConexao.getJogadorOponente());
+                        System.out.println("O primeiro jogador a atacar é: " + mensagemConexao.getQuemDefiniuTamanhoTabuleiro());
+
+//                        Definir de quem será o primeiro turno para o ataque
+                        if (mensagemConexao.getQuemDefiniuTamanhoTabuleiro().equals(nome)) {
+                            meuTurno = true;
+                        }
                     } else {
 
                         throw new RuntimeException("Conexão não estabelecida");
@@ -76,16 +93,59 @@ public class ConsoleCliente extends Thread {
 //            Atualizar o tabuleiro, após estabelecida a conexão com o outro jogador.
             cliente.setTamanhoTabuleiro(mensagemConexao.getTamanhoTabuleiro());
 
-//            Jogador envia ataque
-//           Servidor redireciona ataque para o outro jogador
-//            O outro jogador Recebe o ataque
-
-//            Enviar ataques ao outro jogador
             while (!gameOver) {
-                System.out.println("Digite o endereço de um ataque: ");
-                String request = scanner.nextLine();
-                String response = cliente.sendAtaque(request);
-                System.out.println(response);
+//               Se for o meu turno, solicitar a posição para atacar.
+                HashMap<String, String> response = new HashMap<>();
+                if (meuTurno) {
+                    System.out.printf("Digite o endereço de um ataque ao jogador %s: ", mensagemConexao.getJogadorOponente());
+                    String request = scanner.nextLine();
+                    response = cliente.sendAtaque(request, mensagemConexao.getJogadorOponente());
+
+//                    Mostrar os resultados do meu ataque
+                    if (response.get("resultado").equals("agua")) {
+                        System.out.println("Seu tiro foi na água!");
+                        meuTurno = false;
+                    } else {
+                        if (response.get("navioAfundado").equals("true")) {
+                            System.out.printf("Você afundou o %s %s do jogador %s!", response.get("navioAtingido"), response.get("tipoNavioAtingido"), mensagemConexao.getJogadorOponente());
+                        } else {
+                            System.out.printf("Você atingiu o %s %s do jogador %s!", response.get("navioAtingido"), response.get("tipoNavioAtingido"), mensagemConexao.getJogadorOponente());
+                        }
+                    }
+
+//                    Mostrar o tabuleiro de ataque
+                    System.out.println("Seu tabuleiro de ataque: ");
+                    cliente.mostrarTabuleiroAtaque();
+                } else {
+//                    Se não for o meu turno, aguardar o ataque do outro jogador.
+                    System.out.println("Aguardando o ataque do outro jogador...");
+                    response = cliente.receiveAtaque();
+
+//                    Mostrar os resultados do ataque do outro jogador
+                    if (response.get("resultado").equals("agua")) {
+                        System.out.printf("O tiro do seu oponente %s caiu na água!", mensagemConexao.getJogadorOponente());
+                        meuTurno = true;
+                    } else {
+                        if (response.get("navioAfundado").equals("true")) {
+                            System.out.printf("Seu oponente %s afundou o %s %s!", mensagemConexao.getJogadorOponente(), response.get("tipoNavioAtingido"), response.get("navioAtingido"));
+                        } else {
+                            System.out.printf("Seu oponente %s atingiu o %s %s!", mensagemConexao.getJogadorOponente(), response.get("tipoNavioAtingido"), response.get("navioAtingido"));
+                        }
+                    }
+
+//                    Mostrar o seu tabuleiro
+                    System.out.println("Seu tabuleiro: ");
+                    cliente.mostrarTabuleiro();
+
+
+                }
+
+                //                   Computar se foi Game Over
+                if (response.get("gameOver").equals("true")) {
+                    gameOver = true;
+                    quemGanhou = response.get("quemGanhou");
+                    computarGameOver(nome, quemGanhou);
+                }
             }
 
         } catch (SocketException e) {

@@ -1,6 +1,8 @@
 package br.com.asd.navio;
 
-import java.util.Set;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class Navio {
     private int tamanho;
@@ -9,7 +11,7 @@ public class Navio {
 
     private CategoriasNavio categoria;
 
-    private Set<PosicaoNavio> posicoes;
+    private List<PosicaoNavio> posicoes;
 
     private boolean destruido;
 
@@ -33,6 +35,8 @@ public class Navio {
                 break;
         }
 
+        this.posicoes = new ArrayList<PosicaoNavio>();
+
     }
 
     public int getTamanho() {
@@ -51,11 +55,19 @@ public class Navio {
         this.nome = nome;
     }
 
-    public Set<PosicaoNavio> getPosicoes() {
+    public CategoriasNavio getCategoria() {
+        return categoria;
+    }
+
+    public void setCategoria(CategoriasNavio categoria) {
+        this.categoria = categoria;
+    }
+
+    public List<PosicaoNavio> getPosicoes() {
         return posicoes;
     }
 
-    public void setPosicoes(Set<PosicaoNavio> posicoes) {
+    public void setPosicoes(List<PosicaoNavio> posicoes) {
         this.posicoes = posicoes;
     }
 
@@ -67,5 +79,27 @@ public class Navio {
         this.destruido = destruido;
     }
 
+    public void addPosicao(PosicaoNavio posicao) {
+        this.posicoes.add(posicao);
+    }
+
+    public void receiveAttack(int linha, int coluna) {
+        for (PosicaoNavio posicao : this.posicoes) {
+            if (posicao.getLinha() == linha && posicao.getColuna() == coluna) {
+                posicao.setAtingido(true);
+            }
+        }
+
+        boolean destruido = true;
+
+        for (PosicaoNavio posicao : this.posicoes) {
+            if (!posicao.isAtingido()) {
+                destruido = false;
+                break;
+            }
+        }
+
+        this.destruido = destruido;
+    }
 
 }

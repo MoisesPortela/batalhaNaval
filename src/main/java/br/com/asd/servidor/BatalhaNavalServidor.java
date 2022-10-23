@@ -36,7 +36,7 @@ public class BatalhaNavalServidor extends Thread {
                     }
                 }
 
-                String responseMsg = String.format("statusConnect: %s, tamanhoTabuleiro: %s, quemDefiniuTamanhoTabuleiro: %s, jogadorOponente: %s", true, tamanhoDefinidoTabuleiro, quemDefiniuTamanhoTabuleiro, jogadorOponente);
+                String responseMsg = String.format("statusConnect: %s, tamanhoTabuleiro: %s, quemDefiniuTamanhoTabuleiro: %s, jogadorOponente: %s,", true, tamanhoDefinidoTabuleiro, quemDefiniuTamanhoTabuleiro, jogadorOponente);
                 buf = responseMsg.getBytes();
 
                 DatagramPacket packet = new DatagramPacket(buf, buf.length, InetAddress.getByName("localhost"), Integer.parseInt(entry.getValue()));
@@ -57,11 +57,15 @@ public class BatalhaNavalServidor extends Thread {
         int tamanhoDefinidoTabuleiro = 0;
         String quemDefiniuTamanhoTabuleiro = "";
 
-        Pattern extracaoNomeJogadorPattern = Pattern.compile("(?<=jogador: )(.*)(?=, tipo: )");
-        Pattern extracaoTamanhoTabuleiroPattern = Pattern.compile("(?<=tamanhoTabuleiro: )(.*)");
+        Pattern extracaoNomeJogadorPattern = Pattern.compile("(?<=jogador: )(.*?)(?=,)");
+        Pattern extracaoTamanhoTabuleiroPattern = Pattern.compile("(?<=tamanhoTabuleiro: )(.*?)(?=,)");
+        Pattern extracaoTipoPattern = Pattern.compile("(?<=tipo: )(.*?)(?=,)");
+        Pattern extracaoMovimentoPattern = Pattern.compile("(?<=movimento: )(.*?)(?=, alvo:)");
+        Pattern extracaoAlvoPattern = Pattern.compile("(?<=alvo: )(.*?)(?=,)");
 
         while (running) {
 //            Receber requisição
+            buf = new byte[256];
             DatagramPacket packet = new DatagramPacket(buf, buf.length);
 
             try {
@@ -116,11 +120,49 @@ public class BatalhaNavalServidor extends Thread {
                 System.out.println("Porta:" + packet.getPort());
 
 //                packet = new DatagramPacket(buf, buf.length, address, port);
-
+//                Converter o pacote recebido em String
                 String received = new String(packet.getData(), 0, packet.getLength());
-
                 System.out.println(received);
 
+//                Extrair o tipo de movimento e decidir o que fazer
+                Matcher tipoMatcher = extracaoTipoPattern.matcher(received);
+                Matcher movimentoMatcher = extracaoMovimentoPattern.matcher(received);
+                Matcher alvoMatcher = extracaoAlvoPattern.matcher(received);
+
+                if (tipoMatcher.find()) {
+                    String tipo = tipoMatcher.group(0);
+                    System.out.println("Tipo: " + tipo);
+
+                    if (tipo.equals("ATTACK")) {
+
+                        if (movimentoMatcher.find() && alvoMatcher.find()) {
+                            String movimento = movimentoMatcher.group(0);
+                            String alvo = alvoMatcher.group(0);
+
+                            System.out.println("Movimento: " + movimento);
+                            System.out.println("Alvo: " + alvo);
+
+                            buf = received.getBytes();
+                            int portaAlvo = Integer.parseInt(portasJogadores.get(alvo));
+
+                            packet = new DatagramPacket(buf, buf.length, address, portaAlvo);
+                            socket.send(packet);
+                        }
+                    } else if (tipo.equals("RESPOSTAATAQUE")) {
+                        if (alvoMatcher.find()) {
+                            System.out.println(received);
+                            String alvo = alvoMatcher.group(0);
+
+                            buf = received.getBytes();
+                            int portaAlvo = Integer.parseInt(portasJogadores.get(alvo));
+
+                            packet = new DatagramPacket(buf, buf.length, address, portaAlvo);
+                            socket.send(packet);
+                        }
+                    }
+                }
+
+//                Encerrar a conexão
                 if ("end".equals(received)) {
                     System.out.println("Conexão encerrada.");
                     running = false;

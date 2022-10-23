@@ -2,8 +2,10 @@ package br.com.asd.tabuleiro;
 
 import br.com.asd.navio.CategoriasNavio;
 import br.com.asd.navio.Navio;
+import br.com.asd.navio.PosicaoNavio;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Set;
 
 public class Tabuleiro {
@@ -11,15 +13,13 @@ public class Tabuleiro {
 
     String[][] tabuleiro;
 
+    Set<Navio> naviosJogo;
+
     public Tabuleiro(int tamanhoTabuleiro) {
         this.tamanhoTabuleiro = tamanhoTabuleiro;
         this.tabuleiro = new String[tamanhoTabuleiro][tamanhoTabuleiro];
 
         preencherTabuleiro(tamanhoTabuleiro);
-
-        for (String[]linha : tabuleiro) {
-            System.out.println(Arrays.toString(linha));
-        }
     }
 
     private void preencherTabuleiro(int tamanhoTabuleiro) {
@@ -30,7 +30,7 @@ public class Tabuleiro {
         }
 
 //        Esquadra do jogo
-        Set<Navio> naviosAPosicionar = Set.of(
+        this.naviosJogo = Set.of(
                 new Navio("S1", CategoriasNavio.SUBMARINO),
                 new Navio("S2", CategoriasNavio.SUBMARINO),
                 new Navio("S3", CategoriasNavio.SUBMARINO),
@@ -39,7 +39,7 @@ public class Tabuleiro {
                 new Navio("P1", CategoriasNavio.PORTAAVIAO)
         );
 
-        for (Navio navio : naviosAPosicionar) {
+        for (Navio navio : this.naviosJogo) {
             int tamanhoNavio = navio.getTamanho();
             boolean barcoVertical = Math.random() < 0.5;
 
@@ -69,19 +69,12 @@ public class Tabuleiro {
                     }
                 }
 
-//                Associar as posições encontradas ao navio
-                for (int i = linhaInicio; i < linhaFim; i++) {
-                    for (int j = colunaInicio; j < colunaFim; j++) {
-//                        TODO: IMPLEMENTAR POSIÇÃO DO NAVIO
-                    }
-                }
-
-
 //             Se não colidiu, preencher o tabuleiro com o valor correspondente ao barco
                 if (!colidiu) {
                     for (int i = linhaInicio; i < linhaFim; i++) {
                         for (int j = colunaInicio; j < colunaFim; j++) {
                             tabuleiro[i][j] = navio.getNome();
+                            navio.addPosicao(new PosicaoNavio(i, j));
                         }
                     }
 
@@ -92,8 +85,68 @@ public class Tabuleiro {
             }
 
 
-
         }
 
+    }
+
+    public void mostrarTabuleiro() {
+        for (String[] linha : tabuleiro) {
+            System.out.println(Arrays.toString(linha));
+        }
+    }
+
+    public HashMap<String, String> receiveAttack(Integer linha, Integer coluna) {
+        String ataqueEfetuado = tabuleiro[linha][coluna];
+        HashMap<String, String> resultadoAtaque = new HashMap<>();
+
+//        Estrutura do HashMap
+//        {
+//          "resultado": "agua" | "acertou" | "afundou",
+//          "navioAtingido": "S1" | "S2" | "S3" | "C1" | "C2" | "P1" | null,
+//          "tipoNavioAtingido": "Submarino" | "Cruzador" | "PortaAviao" | null
+//          "navioAfundado": true | false,
+//          "gameOver": "true" | "false"
+//        }
+
+        if (ataqueEfetuado.equals(" ")) {
+            tabuleiro[linha][coluna] = "A";
+
+            resultadoAtaque.put("resultado", "agua");
+            resultadoAtaque.put("navioAtingido", null);
+            resultadoAtaque.put("tipoNavioAtingido", null);
+            resultadoAtaque.put("navioAfundado", "false");
+            resultadoAtaque.put("gameOver", "false");
+        } else {
+            String navioAtingidoString = tabuleiro[linha][coluna];
+            tabuleiro[linha][coluna] = "X";
+
+            Navio navioAtingido = naviosJogo.stream()
+                    .filter(navio -> navio.getNome().equals(navioAtingidoString))
+                    .findFirst()
+                    .orElseThrow();
+
+            navioAtingido.receiveAttack(linha, coluna);
+
+            if (navioAtingido.isDestruido()) {
+                System.out.printf("Seu oponente afundou o %s %s!%n", navioAtingido.getCategoria(), navioAtingido.getNome());
+            }
+
+            resultadoAtaque.put("resultado", navioAtingido.isDestruido() ? "afundou" : "acertou");
+            resultadoAtaque.put("navioAtingido", navioAtingido.getNome());
+            resultadoAtaque.put("tipoNavioAtingido", navioAtingido.getCategoria().toString());
+            resultadoAtaque.put("navioAfundado", navioAtingido.isDestruido() ? "true" : "false");
+
+//            Verificar o GameOver
+            boolean gameOver = true;
+            for (Navio navio : naviosJogo) {
+                if (!navio.isDestruido()) {
+                    gameOver = false;
+                    break;
+                }
+            }
+            resultadoAtaque.put("gameOver", gameOver ? "true" : "false");
+        }
+
+        return resultadoAtaque;
     }
 }
